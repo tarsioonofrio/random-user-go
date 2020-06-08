@@ -14,6 +14,10 @@ import (
 	"github.com/go-pg/pg"
 	"github.com/joho/godotenv"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/dynamodb"
+	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 )
 
 type Request struct {
@@ -61,12 +65,12 @@ func main() {
 
 	fmt.Println(request)
 
-	pessoa1 := &Pessoa{}
-	endereco1 := &Endereco{}
+	pessoa := &Pessoa{}
+	endereco := &Endereco{}
 
 	for _, r := range request.Result {
 		//fmt.Printf("%s -> %s\n", i, r)
-		pessoa1 = &Pessoa{
+		pessoa = &Pessoa{
 			Genero:		r.Gender,
 			Email: 		r.Email,
 			Nome:   	r.Name.First + " " + r.Name.Last,
@@ -74,12 +78,12 @@ func main() {
 			Password : 	r.Login.Password,
 
 		}
-		endereco1 = &Endereco{
-			PessoaID:	pessoa1.ID,
-			Rua:		r.Location.Name,
-			Numero: 	r.Location.Number,
-			Cidade: 	r.Location.City,
-			Estado: 	r.Location.State,
+		endereco = &Endereco{
+			PessoaID: pessoa.ID,
+			Rua:      r.Location.Name,
+			Numero:   r.Location.Number,
+			Cidade:   r.Location.City,
+			Estado:   r.Location.State,
 		}
 	}
 
@@ -97,18 +101,18 @@ func main() {
 	db := pg.Connect(opt)
 	defer db.Close()
 
-	err = db.Insert(pessoa1)
+	err = db.Insert(pessoa)
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.Insert(endereco1)
+	err = db.Insert(endereco)
 	if err != nil {
 		panic(err)
 	}
 
 	// Select user by primary key.
-	pessoa := &Pessoa{ID: pessoa1.ID}
+	pessoa = &Pessoa{ID: pessoa.ID}
 	err = db.Select(pessoa)
 	if err != nil {
 		panic(err)
@@ -121,7 +125,47 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(pessoa)
-	fmt.Println(pessoas)
+	//fmt.Println(pessoa)
+	//fmt.Println(pessoas)
+
+
+	// Initialize a session that the SDK will use to load
+	// credentials from the shared credentials file ~/.aws/credentials
+	// and region from the shared configuration file ~/.aws/config.
+	sess := session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+		Config: aws.Config{Region: aws.String("us-east-1")},
+	}))
+
+	// Create DynamoDB client
+	svc := dynamodb.New(sess)
+
+	for _, r := range request.Result {
+		//fmt.Printf("%s -> %s\n", i, r)
+		av, err := dynamodbattribute.MarshalMap(r)
+		//av["id"] = "1"
+		if err != nil {
+			fmt.Println("Got error marshalling new movie item:")
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+
+		// Create a struct with the movie data and marshall that data into a map of AttributeValue objects.
+		input := &dynamodb.PutItemInput{
+			Item:      av,
+			TableName: aws.String("randomuser"),
+		}
+
+		// Create the input for PutItem and call it. If an error occurs, print the error and exit. If no error occurs, print an message that the item was added to the table.
+		_, err = svc.PutItem(input)
+		if err != nil {
+			fmt.Println("Got error calling PutItem:")
+			fmt.Println(err.Error())
+			os.Exit(1)
+		}
+
+		fmt.Println("Successfully added")
+
+	}
 
 }
