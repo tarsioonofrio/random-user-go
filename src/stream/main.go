@@ -7,10 +7,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
+
+	"github.com/go-pg/pg"
+	"github.com/joho/godotenv"
+
 )
 
-type User struct {
+
+type UserJson struct {
 	Results []struct {
 		Genero string `json:"gender"`
 		Email string `json:"email"`
@@ -31,6 +38,7 @@ type User struct {
 	} `json:"results"`
 }
 
+
 func main() {
 
 	// json data
@@ -48,7 +56,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	var user User
+	var user UserJson
 	err = json.Unmarshal(body, &user)
 	if err != nil {
 		panic(err.Error())
@@ -57,15 +65,62 @@ func main() {
 
 	fmt.Println(user)
 
-	//for key, result := range results {
-	//	gender := result["gender"].(map[string]interface{})
-	//	fmt.Println("Reading Value for Key :", key)
-	//	//Reading each value by its key
-	//	//fmt.Println("Id :", result["id"],
-	//	//	"- Name :", result["name"],
-	//	//	"- Department :", result["department"],
-	//	//	"- Designation :", result["designation"])
-	//	fmt.Println(gender)
-	//	//fmt.Println("Address :", address["city"], address["state"], address["country"])
-	//}
+	err = godotenv.Load("/home/tarsio/personal/randomuser-go/src/.env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	opt, err := pg.ParseURL(os.Getenv("PGCONN2"))
+	if err != nil {
+		panic(err)
+	}
+
+	db := pg.Connect(opt)
+	defer db.Close()
+
+
+
+	pessoa1 := &Pessoa{
+		Nome:   "OIOI",
+		Genero: "Masculino",
+	}
+	err = db.Insert(pessoa1)
+	if err != nil {
+		panic(err)
+	}
+
+	err = db.Insert(&Pessoa{
+		Nome:   "OLAOLA",
+		Genero: "Feminino",
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	endereco1 := &Endereco{
+		Rua:    "Cool story",
+		PessoaID: pessoa1.ID,
+	}
+	err = db.Insert(endereco1)
+	if err != nil {
+		panic(err)
+	}
+
+	// Select user by primary key.
+	pessoa := &Pessoa{ID: pessoa1.ID}
+	err = db.Select(pessoa)
+	if err != nil {
+		panic(err)
+	}
+
+	// Select all users.
+	var pessoas []Pessoa
+	err = db.Model(&pessoas).Select()
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(pessoa)
+	fmt.Println(pessoas)
+
 }
