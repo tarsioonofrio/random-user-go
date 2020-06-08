@@ -16,54 +16,73 @@ import (
 
 )
 
-
-type UserJson struct {
-	Results []struct {
-		Genero string `json:"gender"`
-		Email string `json:"email"`
-		Name   struct {
-			Primeiro string `json:"first"`
-			Ultimo  string `json:"last"`
+type Request struct {
+	Result []struct {
+		Gender	string `json:"gender"`
+		Email	string `json:"email"`
+		Name  	struct {
+			First string `json:"first"`
+			Last  string `json:"last"`
 		} `json:"name"`
 		Login   struct {
 			Username string `json:"username"`
-			Password  string `json:"password"`
+			Password string `json:"password"`
 		} `json:"login"`
 		Location   struct {
-			Rua string `json:"street_name"`
-			Numero  string `json:"street_number"`
-			Cidade  string `json:"city"`
-			Estado  string `json:"state"`
+			Name 	string `json:"street_name"`
+			Number  string `json:"street_number"`
+			City  	string `json:"city"`
+			State  	string `json:"state"`
 		} `json:"location"`
 	} `json:"results"`
 }
 
 
 func main() {
-
 	// json data
 	url := "https://randomuser.me/api/"
 
 	res, err := http.Get(url)
-
 	if err != nil {
 		panic(err.Error())
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
-
 	if err != nil {
 		panic(err.Error())
 	}
 
-	var user UserJson
-	err = json.Unmarshal(body, &user)
+	var request Request
+	err = json.Unmarshal(body, &request)
 	if err != nil {
 		panic(err.Error())
 		//return r
 	}
 
-	fmt.Println(user)
+	fmt.Println(request)
+
+	pessoa1 := &Pessoa{}
+	endereco1 := &Endereco{}
+
+	for _, r := range request.Result {
+		//fmt.Printf("%s -> %s\n", i, r)
+		pessoa1 = &Pessoa{
+			Genero:		r.Gender,
+			Email: 		r.Email,
+			Nome:   	r.Name.First + " " + r.Name.Last,
+			Username:	r.Login.Username,
+			Password : 	r.Login.Password,
+
+		}
+		endereco1 = &Endereco{
+			PessoaID:	pessoa1.ID,
+			Rua:		r.Location.Name,
+			Numero: 	r.Location.Number,
+			Cidade: 	r.Location.City,
+			Estado: 	r.Location.State,
+		}
+	}
+
 
 	err = godotenv.Load("/home/tarsio/personal/randomuser-go/src/.env")
 	if err != nil {
@@ -78,29 +97,11 @@ func main() {
 	db := pg.Connect(opt)
 	defer db.Close()
 
-
-
-	pessoa1 := &Pessoa{
-		Nome:   "OIOI",
-		Genero: "Masculino",
-	}
 	err = db.Insert(pessoa1)
 	if err != nil {
 		panic(err)
 	}
 
-	err = db.Insert(&Pessoa{
-		Nome:   "OLAOLA",
-		Genero: "Feminino",
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	endereco1 := &Endereco{
-		Rua:    "Cool story",
-		PessoaID: pessoa1.ID,
-	}
 	err = db.Insert(endereco1)
 	if err != nil {
 		panic(err)
